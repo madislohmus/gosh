@@ -8,10 +8,12 @@ import (
 	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"os"
+	"time"
 )
 
 const (
 	KeyType = "RSA PRIVATE KEY"
+	Timeout = 10 * time.Second
 )
 
 func GetSigner(keyFile, password string) (*ssh.Signer, error) {
@@ -48,25 +50,41 @@ func GetSigner(keyFile, password string) (*ssh.Signer, error) {
 }
 
 func Run(command, user, host, port string, signer *ssh.Signer) (string, error) {
-	config := &ssh.ClientConfig{
-		User: user,
-		Auth: []ssh.AuthMethod{ssh.PublicKeys(*signer)},
-	}
-	client, err := ssh.Dial("tcp", host+":"+port, config)
-	if err != nil {
-		return "", err
-	}
 
-	session, err := client.NewSession()
-	if err != nil {
-		return "", err
-	}
-	defer session.Close()
+	resChan := make(chan string)
+	errChan := make(chan error)
+	go func() {
+		config := &ssh.ClientConfig{
+			User: user,
+			Auth: []ssh.AuthMethod{ssh.PublicKeys(*signer)},
+		}
+		client, err := ssh.Dial("tcp", host+":"+port, config)
+		if err != nil {
+			errChan <- err
+			return
+		}
 
-	var b bytes.Buffer
-	session.Stdout = &b
-	if err := session.Run(command); err != nil {
+		session, err := client.NewSession()
+		if err != nil {
+			errChan <- err
+			return
+		}
+		defer session.Close()
+		var b bytes.Buffer
+		session.Stdout = &b
+		if err := session.Run(command); err != nil {
+			errChan <- err
+			return
+		}
+		resChan <- b.String()
+	}()
+	timeout := time.After(Timeout)
+	select {
+	case <-timeout:
+		return "", errors.New("Timeout!")
+	case err := <-errChan:
 		return "", err
+	case res := <-resChan:
+		return res, nil
 	}
-	return b.String(), nil
 }
