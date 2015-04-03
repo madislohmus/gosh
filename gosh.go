@@ -13,8 +13,15 @@ import (
 
 const (
 	KeyType = "RSA PRIVATE KEY"
-	Timeout = 10 * time.Second
 )
+
+type Config struct {
+	User    string
+	Host    string
+	Port    string
+	Timeout time.Duration
+	Signer  *ssh.Signer
+}
 
 func GetSigner(keyFile, password string) (*ssh.Signer, error) {
 	fp, err := os.Open(keyFile)
@@ -49,16 +56,15 @@ func GetSigner(keyFile, password string) (*ssh.Signer, error) {
 	return &signer, nil
 }
 
-func Run(command, user, host, port string, signer *ssh.Signer) (string, error) {
-
+func Run(command string, cfg Config) (string, error) {
 	resChan := make(chan string)
 	errChan := make(chan error)
 	go func() {
 		config := &ssh.ClientConfig{
-			User: user,
-			Auth: []ssh.AuthMethod{ssh.PublicKeys(*signer)},
+			User: cfg.User,
+			Auth: []ssh.AuthMethod{ssh.PublicKeys(*cfg.Signer)},
 		}
-		client, err := ssh.Dial("tcp", host+":"+port, config)
+		client, err := ssh.Dial("tcp", cfg.Host+":"+cfg.Port, config)
 		if err != nil {
 			errChan <- err
 			return
@@ -78,7 +84,7 @@ func Run(command, user, host, port string, signer *ssh.Signer) (string, error) {
 		}
 		resChan <- b.String()
 	}()
-	timeout := time.After(Timeout)
+	timeout := time.After(cfg.Timeout)
 	select {
 	case <-timeout:
 		return "", errors.New("Timeout!")
