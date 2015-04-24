@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"os"
@@ -15,12 +16,22 @@ const (
 	KeyType = "RSA PRIVATE KEY"
 )
 
-type Config struct {
-	User    string
-	Host    string
-	Port    string
-	Timeout time.Duration
-	Signer  *ssh.Signer
+type (
+	Config struct {
+		User    string
+		Host    string
+		Port    string
+		Timeout time.Duration
+		Signer  *ssh.Signer
+	}
+
+	TimeoutError struct {
+		timeout time.Duration
+	}
+)
+
+func (te *TimeoutError) Error() string {
+	return fmt.Sprintf("Timeout at %v", te.timeout)
 }
 
 func GetSigner(keyFile, password string) (*ssh.Signer, error) {
@@ -87,7 +98,7 @@ func Run(command string, cfg Config) (string, error) {
 	timeout := time.After(cfg.Timeout)
 	select {
 	case <-timeout:
-		return "", errors.New("Timeout!")
+		return "", &TimeoutError{timeout: cfg.Timeout}
 	case err := <-errChan:
 		return "", err
 	case res := <-resChan:
