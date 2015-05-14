@@ -67,33 +67,48 @@ func GetSigner(keyFile, password string) (*ssh.Signer, error) {
 	return &signer, nil
 }
 
+func GetSession(cfg Config) (*ssh.Session, error) {
+	config := &ssh.ClientConfig{
+		User: cfg.User,
+		Auth: []ssh.AuthMethod{ssh.PublicKeys(*cfg.Signer)},
+	}
+	client, err := ssh.Dial("tcp", cfg.Host+":"+cfg.Port, config)
+	if err != nil {
+		return nil, err
+	}
+	session, err := client.NewSession()
+	if err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
+func RunOnSession(session *ssh.Session, command string) (string, error) {
+	var b bytes.Buffer
+	session.Stdout = &b
+	if err := session.Run(command); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
 func Run(command string, cfg Config) (string, error) {
 	resChan := make(chan string)
 	errChan := make(chan error)
 	go func() {
-		config := &ssh.ClientConfig{
-			User: cfg.User,
-			Auth: []ssh.AuthMethod{ssh.PublicKeys(*cfg.Signer)},
-		}
-		client, err := ssh.Dial("tcp", cfg.Host+":"+cfg.Port, config)
-		if err != nil {
-			errChan <- err
-			return
-		}
 
-		session, err := client.NewSession()
+		session, err := GetSession(cfg)
 		if err != nil {
 			errChan <- err
 			return
 		}
 		defer session.Close()
-		var b bytes.Buffer
-		session.Stdout = &b
-		if err := session.Run(command); err != nil {
+		output, err := RunOnSession(session, command)
+		if err != nil {
 			errChan <- err
 			return
 		}
-		resChan <- b.String()
+		resChan <- output
 	}()
 	timeout := time.After(cfg.Timeout)
 	select {
