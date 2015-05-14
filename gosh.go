@@ -67,20 +67,22 @@ func GetSigner(keyFile, password string) (*ssh.Signer, error) {
 	return &signer, nil
 }
 
-func Run(command string, cfg Config) (string, error) {
+func GetClient(cfg Config) (*ssh.Client, error) {
+	config := &ssh.ClientConfig{
+		User: cfg.User,
+		Auth: []ssh.AuthMethod{ssh.PublicKeys(*cfg.Signer)},
+	}
+	client, err := ssh.Dial("tcp", cfg.Host+":"+cfg.Port, config)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
+func RunOnClient(command string, client ssh.Client, timeout time.Duration) (string, error) {
 	resChan := make(chan string)
 	errChan := make(chan error)
 	go func() {
-		config := &ssh.ClientConfig{
-			User: cfg.User,
-			Auth: []ssh.AuthMethod{ssh.PublicKeys(*cfg.Signer)},
-		}
-		client, err := ssh.Dial("tcp", cfg.Host+":"+cfg.Port, config)
-		if err != nil {
-			errChan <- err
-			return
-		}
-
 		session, err := client.NewSession()
 		if err != nil {
 			errChan <- err
@@ -95,13 +97,22 @@ func Run(command string, cfg Config) (string, error) {
 		}
 		resChan <- b.String()
 	}()
-	timeout := time.After(cfg.Timeout)
+	timeoutChan := time.After(timeout)
 	select {
-	case <-timeout:
-		return "", &TimeoutError{timeout: cfg.Timeout}
+	case <-timeoutChan:
+		return "", &TimeoutError{timeout: timeout}
 	case err := <-errChan:
 		return "", err
 	case res := <-resChan:
 		return res, nil
 	}
+}
+
+func Run(command string, cfg Config, timeout time.Duration) (string, error) {
+	client, err := GetClient(cfg)
+	if err != nil {
+		return "", err
+	}
+	return RunOnClient(command, *client, timeout)
+
 }
