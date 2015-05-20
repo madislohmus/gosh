@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"golang.org/x/crypto/ssh"
 	"io/ioutil"
+	"net"
 	"os"
 	"time"
 )
@@ -67,16 +68,20 @@ func GetSigner(keyFile, password string) (*ssh.Signer, error) {
 	return &signer, nil
 }
 
-func GetClient(cfg Config) (*ssh.Client, error) {
+func GetClient(cfg Config, connectTimeout time.Duration) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User: cfg.User,
 		Auth: []ssh.AuthMethod{ssh.PublicKeys(*cfg.Signer)},
 	}
-	client, err := ssh.Dial("tcp", cfg.Host+":"+cfg.Port, config)
+	conn, err := net.DialTimeout("tcp", cfg.Host+":"+cfg.Port, connectTimeout)
 	if err != nil {
 		return nil, err
 	}
-	return client, nil
+	cliConn, newChan, requestChan, err := ssh.NewClientConn(conn, cfg.Host+":"+cfg.Port, config)
+	if err != nil {
+		return nil, err
+	}
+	return ssh.NewClient(cliConn, newChan, requestChan), nil
 }
 
 func RunOnClient(command string, client ssh.Client, timeout time.Duration) (string, error) {
@@ -108,11 +113,11 @@ func RunOnClient(command string, client ssh.Client, timeout time.Duration) (stri
 	}
 }
 
-func Run(command string, cfg Config, timeout time.Duration) (string, error) {
-	client, err := GetClient(cfg)
+func Run(command string, cfg Config, connectTimeout, runTimeout time.Duration) (string, error) {
+	client, err := GetClient(cfg, connectTimeout)
 	if err != nil {
 		return "", err
 	}
-	return RunOnClient(command, *client, timeout)
+	return RunOnClient(command, *client, runTimeout)
 
 }
