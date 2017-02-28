@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"time"
 
 	"golang.org/x/crypto/ssh"
