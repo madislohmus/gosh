@@ -6,11 +6,12 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"net"
 	"os"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 const (
@@ -36,14 +37,7 @@ func (te *TimeoutError) Error() string {
 }
 
 func GetSigner(keyFile, password string) (*ssh.Signer, error) {
-	fp, err := os.Open(keyFile)
-	if err != nil {
-		return nil, err
-	}
-	defer fp.Close()
-
-	var pk []byte
-	pk, err = ioutil.ReadAll(fp)
+	pk, err := ioutil.ReadFile(keyFile)
 	if err != nil {
 		return nil, err
 	}
