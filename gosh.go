@@ -23,7 +23,7 @@ type (
 		Host    string
 		Port    string
 		Timeout time.Duration
-		Signer  *ssh.Signer
+		Signers []ssh.Signer
 	}
 
 	TimeoutError struct {
@@ -64,7 +64,7 @@ func GetSigner(keyFile, password string) (*ssh.Signer, error) {
 func GetClient(cfg Config, connectTimeout time.Duration) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User: cfg.User,
-		Auth: []ssh.AuthMethod{ssh.PublicKeys(*cfg.Signer)},
+		Auth: []ssh.AuthMethod{ssh.PublicKeys(cfg.Signers...)},
 	}
 	conn, err := net.DialTimeout("tcp", cfg.Host+":"+cfg.Port, connectTimeout)
 	if err != nil {
