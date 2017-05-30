@@ -19,12 +19,12 @@ const (
 
 type (
 	Config struct {
-		User     string
-		Host     string
-		Port     string
-		Timeout  time.Duration
-		Callback ssh.HostKeyCallback
-		Signers  []ssh.Signer
+		User      string
+		Host      string
+		Port      string
+		PublicKey ssh.PublicKey
+		Timeout   time.Duration
+		Signers   []ssh.Signer
 	}
 
 	TimeoutError struct {
@@ -66,7 +66,7 @@ func GetClient(cfg Config, connectTimeout time.Duration) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User:            cfg.User,
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(cfg.Signers...)},
-		HostKeyCallback: cfg.Callback,
+		HostKeyCallback: ssh.FixedHostKey(cfg.PublicKey),
 	}
 	conn, err := net.DialTimeout("tcp", cfg.Host+":"+cfg.Port, connectTimeout)
 	if err != nil {
