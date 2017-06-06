@@ -63,10 +63,14 @@ func GetSigner(keyFile, password string) (*ssh.Signer, error) {
 }
 
 func GetClient(cfg Config, connectTimeout time.Duration) (*ssh.Client, error) {
+	callback := ssh.InsecureIgnoreHostKey()
+	if cfg.PublicKey != nil {
+		callback = ssh.FixedHostKey(cfg.PublicKey)
+	}
 	config := &ssh.ClientConfig{
 		User:            cfg.User,
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(cfg.Signers...)},
-		HostKeyCallback: ssh.FixedHostKey(cfg.PublicKey),
+		HostKeyCallback: callback,
 	}
 	conn, err := net.DialTimeout("tcp", cfg.Host+":"+cfg.Port, connectTimeout)
 	if err != nil {
