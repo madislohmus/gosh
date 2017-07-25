@@ -13,10 +13,6 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const (
-	KeyType = "RSA PRIVATE KEY"
-)
-
 type (
 	Config struct {
 		User      string
@@ -52,7 +48,7 @@ func GetSigner(keyFile, password string) (*ssh.Signer, error) {
 		if err != nil {
 			return nil, err
 		}
-		pk = pem.EncodeToMemory(&pem.Block{Type: KeyType, Bytes: decPk})
+		pk = pem.EncodeToMemory(&pem.Block{Type: block.Type, Bytes: decPk})
 	}
 
 	signer, err := ssh.ParsePrivateKey(pk)
